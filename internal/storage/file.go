@@ -1,4 +1,6 @@
 // internal/storage/file.go
+
+// Replace the existing implementation with this version that explicitly handles endianness
 package storage
 
 import (
@@ -16,6 +18,9 @@ const (
 	// Version of the file format
 	fileVersion = 1
 )
+
+// Use a consistent byte order across all architectures
+var byteOrder = binary.LittleEndian
 
 // Metadata holds information about the exported collection
 type Metadata struct {
@@ -81,7 +86,7 @@ func (w *FileWriter) WriteHeader(metadata Metadata) error {
 func (w *FileWriter) WriteBatch(batch []bson.D) error {
 	// Write batch length
 	batchLengthBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(batchLengthBytes, uint32(len(batch)))
+	byteOrder.PutUint32(batchLengthBytes, uint32(len(batch)))
 	if _, err := w.compressor.Write(batchLengthBytes); err != nil {
 		return err
 	}
@@ -95,7 +100,7 @@ func (w *FileWriter) WriteBatch(batch []bson.D) error {
 
 		// Write document length and data
 		docLengthBytes := make([]byte, 4)
-		binary.LittleEndian.PutUint32(docLengthBytes, uint32(len(data)))
+		byteOrder.PutUint32(docLengthBytes, uint32(len(data)))
 
 		if _, err := w.compressor.Write(docLengthBytes); err != nil {
 			return err
@@ -158,6 +163,7 @@ func (w *FileWriter) WriteFooter(metadata Metadata) error {
 		{Key: "source", Value: w.metadata.Source},
 		{Key: "originalSize", Value: w.metadata.OriginalSize},
 		{Key: "compressedSize", Value: w.metadata.CompressedSize},
+		{Key: "architecture", Value: "cross-platform"}, // Add this to indicate cross-platform compatibility
 	}
 
 	metadataBytes, err := bson.Marshal(metadataDoc)
@@ -167,7 +173,7 @@ func (w *FileWriter) WriteFooter(metadata Metadata) error {
 
 	// Write metadata length
 	metadataLengthBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(metadataLengthBytes, uint32(len(metadataBytes)))
+	byteOrder.PutUint32(metadataLengthBytes, uint32(len(metadataBytes)))
 	if _, err := w.file.Write(metadataLengthBytes); err != nil {
 		return err
 	}
@@ -237,7 +243,7 @@ func (r *FileReader) ReadHeader() (Metadata, error) {
 	if _, err := io.ReadFull(r.file, metadataLengthBytes); err != nil {
 		return Metadata{}, err
 	}
-	metadataLength := binary.LittleEndian.Uint32(metadataLengthBytes)
+	metadataLength := byteOrder.Uint32(metadataLengthBytes)
 
 	// Read metadata
 	metadataBytes := make([]byte, metadataLength)
@@ -282,7 +288,7 @@ func (r *FileReader) ReadBatch(maxBatchSize int) ([]bson.D, error) {
 		}
 		return nil, err
 	}
-	batchLength := binary.LittleEndian.Uint32(batchLengthBytes)
+	batchLength := byteOrder.Uint32(batchLengthBytes)
 
 	// Limit batch size
 	actualBatchSize := int(batchLength)
@@ -299,7 +305,7 @@ func (r *FileReader) ReadBatch(maxBatchSize int) ([]bson.D, error) {
 		if _, err := io.ReadFull(r.decompressor, docLengthBytes); err != nil {
 			return batch, err
 		}
-		docLength := binary.LittleEndian.Uint32(docLengthBytes)
+		docLength := byteOrder.Uint32(docLengthBytes)
 
 		// Read document data
 		docBytes := make([]byte, docLength)

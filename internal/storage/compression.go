@@ -2,7 +2,9 @@
 package storage
 
 import (
+	"fmt"
 	"io"
+	"strings"
 
 	"github.com/klauspost/compress/zstd"
 )
@@ -40,7 +42,10 @@ func (c *Compressor) Close() error {
 func NewDecompressor(r io.Reader) (*Decompressor, error) {
 	decoder, err := zstd.NewReader(r)
 	if err != nil {
-		return nil, err
+		if strings.Contains(err.Error(), "invalid header") {
+			return nil, fmt.Errorf("invalid input: compressed data is corrupted or not in zstd format")
+		}
+		return nil, fmt.Errorf("decompression error: %w", err)
 	}
 	return &Decompressor{reader: decoder}, nil
 }

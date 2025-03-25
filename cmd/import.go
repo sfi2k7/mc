@@ -4,6 +4,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/sfi2k7/mc/internal/db"
@@ -45,13 +46,6 @@ func runImport(database, collection string, drop bool, inputFile string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
-	// Connect to MongoDB
-	client, err := db.Connect(ctx, uri, host, port)
-	if err != nil {
-		return fmt.Errorf("failed to connect to MongoDB: %w", err)
-	}
-	defer client.Disconnect(ctx)
-
 	// Create file reader
 	fileReader, err := storage.NewFileReader(inputFile)
 	if err != nil {
@@ -62,6 +56,13 @@ func runImport(database, collection string, drop bool, inputFile string) error {
 	// Read header
 	metadata, err := fileReader.ReadHeader()
 	if err != nil {
+		if strings.Contains(err.Error(), "invalid file format") ||
+			strings.Contains(err.Error(), "magic number mismatch") {
+			return fmt.Errorf("invalid file format: the file may be corrupted or not an MCBZ file")
+		}
+		if strings.Contains(err.Error(), "unsupported file version") {
+			return fmt.Errorf("unsupported file version: this file was created with a newer version of mc")
+		}
 		return fmt.Errorf("failed to read header: %w", err)
 	}
 
@@ -70,6 +71,13 @@ func runImport(database, collection string, drop bool, inputFile string) error {
 		"source_coll", metadata.Collection,
 		"target_db", database,
 		"target_coll", collection)
+
+	// Connect to MongoDB
+	client, err := db.Connect(ctx, uri, host, port)
+	if err != nil {
+		return fmt.Errorf("failed to connect to MongoDB: %w", err)
+	}
+	defer client.Disconnect(ctx)
 
 	// Initialize progress bar
 	progress := utils.NewProgressBar("Importing")
