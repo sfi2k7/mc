@@ -12,6 +12,7 @@ import (
 )
 
 func newInspectCmd() *cobra.Command {
+	var validate bool
 	inspectCmd := &cobra.Command{
 		Use:   "inspect FILE",
 		Short: "Display metadata information about an MCBZ file",
@@ -19,14 +20,16 @@ func newInspectCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			filePath := args[0]
-			return runInspect(filePath)
+			return runInspect(filePath, validate)
 		},
 	}
+
+	inspectCmd.Flags().BoolVar(&validate, "validate", false, "Perform additional validation of file contents")
 
 	return inspectCmd
 }
 
-func runInspect(filePath string) error {
+func runInspect(filePath string, validate bool) error {
 	// Get file stat info
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
@@ -81,6 +84,39 @@ func runInspect(filePath string) error {
 	fmt.Printf("Compression ratio: %.2f:1 (%.1f%% reduction)\n",
 		compressionRatio,
 		(1-float64(metadata.CompressedSize)/float64(metadata.OriginalSize))*100)
+
+	// Add validation section if requested
+	if validate {
+		fmt.Println("\n=== Validation Results ===")
+
+		// Validate file integrity by reading first batch
+		batchSize := 10
+		batch, err := fileReader.ReadBatch(batchSize)
+		if err != nil {
+			fmt.Println("Status: FAILED")
+			fmt.Printf("Error: %s\n", err)
+			return nil
+		}
+
+		docCount := len(batch)
+		fmt.Printf("Status: OK (Read %d sample documents successfully)\n", docCount)
+
+		if docCount > 0 {
+			fmt.Println("Sample document keys:")
+			// Display up to 5 keys from first document
+			doc := batch[0]
+			keyCount := 0
+			for _, elem := range doc {
+				if keyCount < 5 {
+					fmt.Printf("  - %s (%T)\n", elem.Key, elem.Value)
+					keyCount++
+				} else {
+					fmt.Printf("  - ... and %d more\n", len(doc)-5)
+					break
+				}
+			}
+		}
+	}
 
 	return nil
 }
