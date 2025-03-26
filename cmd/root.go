@@ -33,6 +33,8 @@ Supports exporting and importing collections while preserving BSON types.`,
 	rootCmd.AddCommand(newExportCmd())
 	rootCmd.AddCommand(newImportCmd())
 	rootCmd.AddCommand(newInspectCmd())
+	rootCmd.AddCommand(newCompressCmd())
+	rootCmd.AddCommand(newUncompressCmd())
 }
 
 // Execute runs the root command

@@ -4,6 +4,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/sfi2k7/mc/internal/storage"
@@ -29,6 +30,8 @@ func newInspectCmd() *cobra.Command {
 	return inspectCmd
 }
 
+// In the runInspect function in cmd/inspect.go:
+
 func runInspect(filePath string, validate bool) error {
 	// Get file stat info
 	fileInfo, err := os.Stat(filePath)
@@ -46,23 +49,21 @@ func runInspect(filePath string, validate bool) error {
 	// Read header
 	metadata, err := fileReader.ReadHeader()
 	if err != nil {
-		return fmt.Errorf("failed to read header: %w", err)
+		fmt.Println("=== File Header Error ===")
+		fmt.Printf("Error: %s\n", err)
+		return nil
 	}
 
-	// Calculate human-readable sizes
+	// Format human-readable sizes
 	fileSizeHuman := utils.FormatByteSize(fileInfo.Size())
-	originalSizeHuman := utils.FormatByteSize(metadata.OriginalSize)
-	compressedSizeHuman := utils.FormatByteSize(metadata.CompressedSize)
-
-	// Calculate compression ratio
-	compressionRatio := float64(metadata.OriginalSize) / float64(metadata.CompressedSize)
+	totalSizeHuman := utils.FormatByteSize(metadata.TotalSize)
 
 	// Format creation times
 	fileCreationTime := fileInfo.ModTime().Format(time.RFC1123)
 	exportTime := time.Unix(metadata.Timestamp, 0).Format(time.RFC1123)
 
 	// Print file information
-	fmt.Println("=== MCBZ File Information ===")
+	fmt.Println("=== MCBF File Information ===")
 	fmt.Println("File path:", filePath)
 	fmt.Println("File size:", fileSizeHuman, fmt.Sprintf("(%d bytes)", fileInfo.Size()))
 	fmt.Println("File created:", fileCreationTime)
@@ -77,13 +78,11 @@ func runInspect(filePath string, validate bool) error {
 	fmt.Println("Export time:", exportTime)
 	fmt.Println("")
 
-	// Print compression information
-	fmt.Println("=== Compression Information ===")
-	fmt.Println("Original size:", originalSizeHuman, fmt.Sprintf("(%d bytes)", metadata.OriginalSize))
-	fmt.Println("Compressed size:", compressedSizeHuman, fmt.Sprintf("(%d bytes)", metadata.CompressedSize))
-	fmt.Printf("Compression ratio: %.2f:1 (%.1f%% reduction)\n",
-		compressionRatio,
-		(1-float64(metadata.CompressedSize)/float64(metadata.OriginalSize))*100)
+	// Print platform information
+	fmt.Println("=== Platform Information ===")
+	fmt.Println("Source platform:", metadata.Platform)
+	fmt.Println("Current platform:", runtime.GOARCH+"-"+runtime.GOOS)
+	fmt.Println("Data size:", totalSizeHuman, fmt.Sprintf("(%d bytes)", metadata.TotalSize))
 
 	// Add validation section if requested
 	if validate {

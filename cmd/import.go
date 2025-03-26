@@ -4,6 +4,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -56,14 +57,21 @@ func runImport(database, collection string, drop bool, inputFile string) error {
 	// Read header
 	metadata, err := fileReader.ReadHeader()
 	if err != nil {
-		if strings.Contains(err.Error(), "invalid file format") ||
-			strings.Contains(err.Error(), "magic number mismatch") {
-			return fmt.Errorf("invalid file format: the file may be corrupted or not an MCBZ file")
+		if strings.Contains(err.Error(), "invalid file format") {
+			return fmt.Errorf("invalid file format: this is not a valid MCBF file or the file is corrupted")
 		}
 		if strings.Contains(err.Error(), "unsupported file version") {
 			return fmt.Errorf("unsupported file version: this file was created with a newer version of mc")
 		}
 		return fmt.Errorf("failed to read header: %w", err)
+	}
+
+	// Log platform differences for diagnostics
+	currentPlatform := runtime.GOARCH + "-" + runtime.GOOS
+	if metadata.Platform != "" && metadata.Platform != currentPlatform {
+		logger.Info("Cross-platform import detected",
+			"source_platform", metadata.Platform,
+			"current_platform", currentPlatform)
 	}
 
 	logger.Info("Importing collection",

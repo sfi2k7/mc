@@ -85,6 +85,19 @@ func (p *ProgressBar) render() {
 		p.operation, bar, percent*100, p.current, p.total, eta)
 }
 
+// SetCurrent sets the current progress value
+func (p *ProgressBar) SetCurrent(current int64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.current = current
+
+	// Only update visually every 100ms to avoid terminal flicker
+	if time.Since(p.lastUpdate) > 100*time.Millisecond {
+		p.render()
+		p.lastUpdate = time.Now()
+	}
+}
+
 // formatDuration formats a duration for display
 func formatDuration(d time.Duration) string {
 	if d < time.Minute {

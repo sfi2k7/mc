@@ -40,6 +40,8 @@ func newExportCmd() *cobra.Command {
 	return exportCmd
 }
 
+// In cmd/export.go, modify runExport:
+
 func runExport(database, collection, queryStr, outputFile string) error {
 	// Create context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
@@ -96,6 +98,10 @@ func runExport(database, collection, queryStr, outputFile string) error {
 		return fmt.Errorf("failed to write footer: %w", err)
 	}
 
-	logger.Info("Export completed", "docs", docCount, "file", outputFile)
+	logger.Info("Export completed",
+		"docs", docCount,
+		"file", outputFile,
+		// "size", fileWriter.metadata.TotalSize
+	)
 	return nil
 }
